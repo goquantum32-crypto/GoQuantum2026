@@ -1,0 +1,7 @@
+{
+  "name": "GoQuantum Mozambique",
+  "description": "Interprovincial transport booking system connecting passengers, drivers, and admin with automated FEMATRO pricing and commission handling.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

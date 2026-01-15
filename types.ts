@@ -41,6 +41,8 @@ export interface Route {
   price: number;
 }
 
+export type ParcelSize = 'Pequeno' | 'Médio' | 'Grande';
+
 export interface Trip {
   id: string;
   routeId: string;
@@ -49,13 +51,15 @@ export interface Trip {
   date: string; // ISO date string
   seats: number;
   type: 'passenger' | 'parcel';
-  status: 'pending' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled';
+  // waiting_quote: Passenger sent parcel, Admin needs to set price
+  // quote_received: Admin set price, Passenger needs to accept/pay
+  status: 'pending' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'waiting_quote' | 'quote_received';
   totalPrice: number;
   commission: number; // 15%
   driverEarnings: number; // 85%
   paymentMethod?: 'M-Pesa' | 'E-Mola' | 'Cash'; 
   parcelDetails?: {
-    weight: number;
+    size: ParcelSize;
     description: string;
   };
   // Feedback fields

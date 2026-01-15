@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { getTripsForUser, getRoutes, getUsers, updateUserStatus, assignDriver } from '../services/mockService';
+import { getTripsForUser, getRoutes, getUsers, updateUserStatus, assignDriver, setParcelQuote } from '../services/mockService';
 import { User, Trip, WeeklySchedule } from '../types';
 import { EN1_STOPS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Download, CheckCircle, XCircle, FileText, Truck, LayoutDashboard, Database, UserCheck, Shield, CreditCard, ArrowUpDown, Filter, Map, Calendar, Phone } from 'lucide-react';
+import { Download, CheckCircle, XCircle, FileText, Truck, LayoutDashboard, Database, UserCheck, Shield, CreditCard, ArrowUpDown, Filter, Map, Calendar, Phone, Clock, AlertTriangle, MessageSquare } from 'lucide-react';
 
 interface AdminDashboardProps {
   user: User;
@@ -13,6 +13,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'drivers' | 'trips' | 'payments'>('dashboard');
   const [refresh, setRefresh] = useState(0);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null); // For assigning driver modal
+  const [quoteTripId, setQuoteTripId] = useState<string | null>(null); // For parcel quote modal
+  const [quotePrice, setQuotePrice] = useState(0);
 
   // Payment Filters & Sorting
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'M-Pesa' | 'E-Mola'>('all');
@@ -42,10 +44,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       }
   };
 
+  const handleSetQuote = () => {
+      if (quoteTripId && quotePrice > 0) {
+          setParcelQuote(quoteTripId, quotePrice);
+          setQuoteTripId(null);
+          setQuotePrice(0);
+          setRefresh(prev => prev + 1);
+      }
+  };
+
   // Stats
-  const totalRevenue = trips.reduce((acc, t) => acc + t.totalPrice, 0);
-  const companyCommission = trips.reduce((acc, t) => acc + t.commission, 0);
-  const driverPayouts = trips.reduce((acc, t) => acc + t.driverEarnings, 0);
+  const totalRevenue = trips.filter(t => t.status !== 'pending' && t.status !== 'cancelled' && t.status !== 'waiting_quote').reduce((acc, t) => acc + t.totalPrice, 0);
+  const companyCommission = trips.filter(t => t.status !== 'pending' && t.status !== 'cancelled' && t.status !== 'waiting_quote').reduce((acc, t) => acc + t.commission, 0);
+  const driverPayouts = trips.filter(t => t.status !== 'pending' && t.status !== 'cancelled' && t.status !== 'waiting_quote').reduce((acc, t) => acc + t.driverEarnings, 0);
 
   // Helper: Logic to check if a driver's full path covers the passenger's path
   const isDriverRouteCompatible = (driverOrigin: string, driverDest: string, passOrigin: string, passDest: string) => {
@@ -122,7 +133,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const chartData = routes
     .filter(r => r.origin === 'Maputo') // Only show main routes in chart to avoid clutter
     .map(route => {
-    const routeTrips = trips.filter(t => t.routeId === route.id);
+    const routeTrips = trips.filter(t => t.routeId === route.id && t.status !== 'pending');
     return {
       name: route.destination,
       Viagens: routeTrips.length,
@@ -132,7 +143,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
 
   // Payments Logic
   const filteredPayments = useMemo(() => {
-    let result = trips.filter(t => t.status !== 'cancelled'); // Show pending too as they paid
+    let result = trips.filter(t => t.status !== 'cancelled' && t.status !== 'waiting_quote'); 
     
     // Filter
     if (paymentFilter !== 'all') {
@@ -155,7 +166,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-            <p className="text-slate-400 text-sm font-medium uppercase mb-2">Receita Total</p>
+            <p className="text-slate-400 text-sm font-medium uppercase mb-2">Receita (Confirmada)</p>
             <h3 className="text-3xl font-black text-white">{totalRevenue.toLocaleString()} MT</h3>
         </div>
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
@@ -303,7 +314,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                             <tr key={trip.id} className="border-b border-slate-700 hover:bg-slate-700/50">
                                 <td className="px-6 py-4">{new Date(trip.date).toLocaleDateString()}</td>
                                 <td className="px-6 py-4">{route?.origin} ➔ {route?.destination}</td>
-                                <td className="px-6 py-4 capitalize">{trip.type}</td>
+                                <td className="px-6 py-4 capitalize">
+                                    {trip.type}
+                                    {trip.type === 'parcel' && (
+                                        <span className="block text-[10px] text-slate-500">{trip.parcelDetails?.size} - {trip.parcelDetails?.description}</span>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col">
                                         <span className="text-white font-medium">{passenger?.name || trip.passengerId}</span>
@@ -312,26 +328,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                                         </span>
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 font-bold text-white">{driver?.name || '---'}</td>
+                                <td className="px-6 py-4">
+                                    {driver ? (
+                                        <div className="flex flex-col">
+                                            <span className="text-white font-bold">{driver.name}</span>
+                                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                <Phone size={10} /> {driver.phone}
+                                            </span>
+                                        </div>
+                                    ) : '---'}
+                                </td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 rounded text-xs font-bold ${
                                         trip.status === 'completed' ? 'bg-green-500/20 text-green-500' :
                                         (trip.status === 'confirmed' || trip.status === 'in-progress') ? 'bg-blue-500/20 text-blue-500' :
+                                        trip.status === 'cancelled' ? 'bg-red-500/20 text-red-500' :
+                                        trip.status === 'waiting_quote' ? 'bg-purple-500/20 text-purple-500' :
                                         'bg-yellow-500/20 text-yellow-500'
                                     }`}>
                                         {trip.status === 'pending' ? 'Pendente' : 
+                                         trip.status === 'waiting_quote' ? 'Nova Cotação' :
+                                         trip.status === 'quote_received' ? 'Aguardando Pagamento' :
                                          trip.status === 'confirmed' ? 'Confirmada' : 
-                                         trip.status === 'in-progress' ? 'Em curso' : 'Concluída'}
+                                         trip.status === 'in-progress' ? 'Em curso' : 
+                                         trip.status === 'cancelled' ? 'Cancelada' : 'Concluída'}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    {trip.status === 'pending' && (
+                                    {trip.status === 'waiting_quote' && (
                                         <button 
-                                            onClick={() => setSelectedTripId(trip.id)}
-                                            className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg"
+                                            onClick={() => { setQuoteTripId(trip.id); setQuotePrice(0); }}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg flex items-center gap-1 ml-auto"
                                         >
-                                            Atribuir Motorista
+                                            <MessageSquare size={12} /> Definir Preço
                                         </button>
+                                    )}
+                                    {trip.status === 'pending' && (
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-[10px] text-yellow-500 font-bold mb-1">Verificar Pagamento!</span>
+                                            <button 
+                                                onClick={() => setSelectedTripId(trip.id)}
+                                                className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg"
+                                            >
+                                                Confirmar e Atribuir
+                                            </button>
+                                        </div>
                                     )}
                                 </td>
                             </tr>
@@ -383,6 +424,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                 <tbody>
                     {filteredPayments.map(trip => {
                             const passenger = allUsers.find(u => u.id === trip.passengerId);
+                            const isPending = trip.status === 'pending';
+
                             return (
                                 <tr key={trip.id} className="border-b border-slate-700 hover:bg-slate-700/50">
                                     <td className="px-6 py-4 font-mono text-xs text-slate-500">{trip.id.toUpperCase()}</td>
@@ -401,10 +444,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="flex items-center gap-1 text-green-400">
-                                            <CheckCircle size={14} />
-                                            <span>Pago</span>
-                                        </div>
+                                        {isPending ? (
+                                             <div className="flex items-center gap-1 text-yellow-500 animate-pulse">
+                                                <Clock size={14} />
+                                                <span className="font-bold">Aguardando Confirmação</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1 text-green-400">
+                                                <CheckCircle size={14} />
+                                                <span>Pago</span>
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-right font-bold text-white">{trip.totalPrice} MT</td>
                                 </tr>
@@ -462,12 +512,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       {activeTab === 'drivers' && renderDrivers()}
       {activeTab === 'trips' && renderTrips()}
       {activeTab === 'payments' && renderPayments()}
+      
+      {/* Quote Modal */}
+      {quoteTripId && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+              <div className="bg-slate-800 rounded-2xl w-full max-w-md p-6 border border-slate-700 my-auto">
+                  <h3 className="text-xl font-bold text-white mb-2">Definir Preço da Encomenda</h3>
+                  <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 mb-4 flex items-start gap-2">
+                       <Phone className="text-blue-400 shrink-0 mt-0.5" size={16} />
+                       <p className="text-xs text-blue-200">
+                           <strong>Passo 1:</strong> Ligue para um motorista disponível para negociar o valor do transporte da carga.
+                       </p>
+                  </div>
+                  
+                  {(() => {
+                      const trip = trips.find(t => t.id === quoteTripId);
+                      if (!trip) return null;
+                      
+                      // Get compatible drivers for this parcel route
+                      const availableDrivers = getAvailableDriversForTrip(trip);
+
+                      return (
+                        <>
+                            <div className="bg-slate-900 p-3 rounded mb-4 text-sm text-slate-300">
+                                <p><strong>Item:</strong> {trip.parcelDetails?.description}</p>
+                                <p><strong>Tamanho:</strong> {trip.parcelDetails?.size}</p>
+                                <p><strong>Rota:</strong> {routes.find(r => r.id === trip.routeId)?.origin} - {routes.find(r => r.id === trip.routeId)?.destination}</p>
+                            </div>
+
+                            <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Motoristas Disponíveis para Negociação:</p>
+                            <div className="max-h-40 overflow-y-auto mb-6 space-y-2 pr-1">
+                                {availableDrivers.length === 0 ? (
+                                    <p className="text-xs text-red-400 italic">Nenhum motorista com escala compatível nesta data.</p>
+                                ) : (
+                                    availableDrivers.map(d => (
+                                        <div key={d.id} className="flex justify-between items-center bg-slate-700/50 p-2 rounded border border-slate-600">
+                                            <div>
+                                                <p className="text-white text-sm font-bold">{d.name}</p>
+                                                <p className="text-xs text-slate-400">{d.vehiclePlate}</p>
+                                            </div>
+                                            <a href={`tel:${d.phone}`} className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1.5 rounded transition-colors">
+                                                <Phone size={12} /> {d.phone}
+                                            </a>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <div className="border-t border-slate-700 pt-4">
+                                <p className="text-xs text-blue-200 mb-2">
+                                    <strong>Passo 2:</strong> Insira o valor acordado + comissão para o cliente.
+                                </p>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Preço Final ao Cliente (MT)</label>
+                                <input 
+                                    type="number" 
+                                    value={quotePrice}
+                                    onChange={(e) => setQuotePrice(Number(e.target.value))}
+                                    className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold mb-4 focus:ring-2 focus:ring-purple-500 outline-none"
+                                    placeholder="Ex: 500"
+                                />
+
+                                <div className="flex gap-3">
+                                    <button onClick={() => setQuoteTripId(null)} className="flex-1 py-3 text-slate-400 hover:text-white text-sm">Cancelar</button>
+                                    <button onClick={handleSetQuote} disabled={quotePrice <= 0} className="flex-1 bg-purple-600 text-white font-bold rounded-lg py-3 hover:bg-purple-700 disabled:opacity-50 text-sm">
+                                        Enviar Cotação
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                      );
+                  })()}
+              </div>
+          </div>
+      )}
 
       {/* Driver Assignment Modal */}
       {selectedTripId && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
               <div className="bg-slate-800 rounded-2xl w-full max-w-lg p-6 border border-slate-700">
                   <h3 className="text-xl font-bold text-white mb-4">Atribuir Motorista</h3>
+                  <div className="bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20 mb-4 flex items-start gap-2">
+                       <AlertTriangle className="text-yellow-500 shrink-0 mt-0.5" size={16} />
+                       <p className="text-sm text-yellow-200">
+                           <strong>Atenção Admin:</strong> Verifique se recebeu o valor via M-Pesa/E-Mola antes de atribuir o motorista. Ao atribuir, a viagem será confirmada.
+                       </p>
+                  </div>
                   <p className="text-slate-400 mb-4 text-sm">A mostrar motoristas com escala compatível para a data da viagem.</p>
                   
                   <div className="space-y-2 max-h-60 overflow-y-auto mb-6">
@@ -484,11 +613,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                               <div key={driver.id} className="flex items-center justify-between bg-slate-700 p-3 rounded-lg border border-slate-600">
                                   <div>
                                       <p className="text-white font-bold">{driver.name}</p>
-                                      <p className="text-xs text-slate-400 flex gap-2">
-                                          <span>{driver.vehiclePlate}</span> |
+                                      <p className="text-xs text-slate-400 flex items-center gap-1">
+                                          <Phone size={12} className="text-green-400" />
+                                          <span className="text-green-400 font-bold">{driver.phone}</span>
+                                          <span className="text-slate-600 mx-1">|</span>
+                                          <span className="uppercase">{driver.vehiclePlate}</span>
+                                      </p>
+                                      <p className="text-xs mt-1">
                                           {/* Show specific route info if available for that day, otherwise generic */}
                                           {driver.specificSchedule?.[trip.date.split('T')[0]] ? (
-                                              <span className="text-green-400 font-bold">Escala Específica: {driver.specificSchedule[trip.date.split('T')[0]].destination}</span>
+                                              <span className="text-green-400">Escala Específica: {driver.specificSchedule[trip.date.split('T')[0]].destination}</span>
                                           ) : (
                                               <span className="text-yellow-400">Escala Padrão</span>
                                           )}
@@ -498,7 +632,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                                       onClick={() => handleAssignDriver(driver.id)}
                                       className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-2 rounded"
                                   >
-                                      Selecionar
+                                      Confirmar
                                   </button>
                               </div>
                           ));

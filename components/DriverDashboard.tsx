@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { User, WeeklySchedule, DailyRoute } from '../types';
-import { getTripsForUser, getRoutes, updateDriverSchedule, getUsers, updateDriverSpecificDate } from '../services/mockService';
-import { CheckCircle, Map, DollarSign, User as UserIcon, Package, Calendar, Clock, ArrowRight, Phone, ChevronLeft, ChevronRight, Save } from 'lucide-react';
+import { getTripsForUser, getRoutes, getUsers, updateDriverSpecificDate } from '../services/mockService';
+import { CheckCircle, Map, DollarSign, User as UserIcon, Package, Calendar, ChevronLeft, ChevronRight, Save, Phone } from 'lucide-react';
 
 interface DriverDashboardProps {
   user: User;
@@ -18,9 +18,15 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
   // Local state for the selected day's route configuration (before saving)
   const [dayConfig, setDayConfig] = useState<DailyRoute>({ origin: 'Maputo', destination: 'Xai-Xai', active: true });
 
+  // IMPORTANT: Depend on 'refresh' to reload users from storage
+  const allUsers = useMemo(() => getUsers(), [refresh]);
+  
+  // IMPORTANT: Use the fresh user data from storage, fallback to prop user if not found
+  const currentUser = allUsers.find(u => u.id === user.id) || user;
+
   const trips = useMemo(() => getTripsForUser(user.id, 'driver'), [user.id, refresh]);
   const routes = useMemo(() => getRoutes(), []);
-  const allUsers = useMemo(() => getUsers(), []);
+  
   const availableOrigins = useMemo(() => [...new Set(routes.map(r => r.origin))].sort(), [routes]);
   const availableDestinations = useMemo(() => [...new Set(routes.map(r => r.destination))].sort(), [routes]);
 
@@ -43,16 +49,16 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
   const getDaySchedule = (year: number, month: number, day: number): DailyRoute | null => {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       
-      // 1. Check Specific Date
-      if (user.specificSchedule && user.specificSchedule[dateStr]) {
-          return user.specificSchedule[dateStr];
+      // 1. Check Specific Date (Using currentUser to see updates immediately)
+      if (currentUser.specificSchedule && currentUser.specificSchedule[dateStr]) {
+          return currentUser.specificSchedule[dateStr];
       }
       
-      // 2. Fallback to Weekly Template
+      // 2. Fallback to Weekly Template (Using currentUser)
       const dayOfWeek = new Date(year, month, day).getDay();
       const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      if (user.schedule) {
-          return user.schedule[dayMap[dayOfWeek] as keyof WeeklySchedule];
+      if (currentUser.schedule) {
+          return currentUser.schedule[dayMap[dayOfWeek] as keyof WeeklySchedule];
       }
       
       return null;
@@ -73,9 +79,9 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
 
   const handleSaveDayConfig = () => {
       if (selectedDateStr) {
-          updateDriverSpecificDate(user.id, selectedDateStr, dayConfig);
+          updateDriverSpecificDate(currentUser.id, selectedDateStr, dayConfig);
           setSelectedDateStr(null);
-          setRefresh(prev => prev + 1); // Force re-render of calendar
+          setRefresh(prev => prev + 1); // Force re-render of calendar and re-fetch of users
       }
   };
 
@@ -118,7 +124,7 @@ export const DriverDashboard: React.FC<DriverDashboardProps> = ({ user }) => {
         <div className="flex items-center gap-4 text-sm text-slate-300 mb-2 bg-slate-900/50 p-3 rounded-lg">
              <div>
                 <span className="text-slate-500 block text-xs uppercase">Detalhes da Carga/Lugares</span>
-                {trip.type === 'passenger' ? `${trip.seats} Lugares Reservados` : `${trip.parcelDetails?.weight}kg Encomenda`}
+                {trip.type === 'passenger' ? `${trip.seats} Lugares Reservados` : `${trip.parcelDetails?.weight || '---'}kg Encomenda`}
              </div>
         </div>
         

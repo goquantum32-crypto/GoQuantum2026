@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { User, Trip } from '../types';
-import { getRoutes, createTrip, getTripsForUser, updateTripStatus, completeTripWithRating } from '../services/mockService';
-import { Bus, Package, Calendar, MapPin, CreditCard, CheckCircle, Clock, Navigation, Play, Flag, AlertTriangle, Star, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { User, Trip, ParcelSize } from '../types';
+import { getRoutes, createTrip, getTripsForUser, updateTripStatus, completeTripWithRating, cancelTrip, rescheduleTrip, acceptParcelQuote, getUsers } from '../services/mockService';
+import { Bus, Package, Calendar, MapPin, CreditCard, CheckCircle, Clock, Navigation, Play, Flag, AlertTriangle, Star, ThumbsUp, ThumbsDown, Phone, XCircle, RotateCw } from 'lucide-react';
 
 interface PassengerViewProps {
   user: User;
@@ -16,11 +16,19 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const [date, setDate] = useState('');
   const [seats, setSeats] = useState(1);
-  const [weight, setWeight] = useState(1);
+  
+  // Parcel Form State
+  const [parcelSize, setParcelSize] = useState<ParcelSize>('Pequeno');
+  const [parcelDesc, setParcelDesc] = useState('');
+  
   const [showPayment, setShowPayment] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'M-Pesa' | 'E-Mola'>('M-Pesa');
   
+  // Reschedule Modal
+  const [rescheduleTripId, setRescheduleTripId] = useState<string | null>(null);
+  const [newDate, setNewDate] = useState('');
+
   // Rating Modal State
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingTripId, setRatingTripId] = useState<string | null>(null);
@@ -35,6 +43,7 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
 
   const routes = useMemo(() => getRoutes(), []);
   const history = useMemo(() => getTripsForUser(user.id, 'passenger'), [user.id, refreshTrigger]);
+  const allUsers = useMemo(() => getUsers(), [refreshTrigger]); // Needed to find driver details
 
   // Derived data
   const availableOrigins = useMemo(() => [...new Set(routes.map(r => r.origin))].sort(), [routes]);
@@ -44,18 +53,37 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
 
   const selectedRoute = routes.find(r => r.id === selectedRouteId);
   const price = selectedRoute 
-    ? (bookingType === 'passenger' ? selectedRoute.price * seats : (selectedRoute.price * 0.2 + weight * 50)) 
+    ? (bookingType === 'passenger' ? selectedRoute.price * seats : 0) // Parcel price starts at 0
     : 0;
 
   const handleBook = () => {
     if (!selectedRouteId || !date) return;
-    setShowPayment(true);
+    
+    if (bookingType === 'parcel') {
+        // Parcels skip payment screen initially, goes to quote
+        setIsProcessing(true);
+        setTimeout(() => {
+            createTrip(user, selectedRouteId, date, 0, 'parcel', paymentMethod, { size: parcelSize, description: parcelDesc });
+            setIsProcessing(false);
+            setRefreshTrigger(prev => prev + 1);
+            setActiveTab('history');
+            // Reset form
+            setSelectedRouteId('');
+            setDate('');
+            setOrigin('');
+            setParcelDesc('');
+        }, 1000);
+    } else {
+        // Passengers go to payment
+        setShowPayment(true);
+    }
   };
 
   const confirmPayment = () => {
     setIsProcessing(true);
+    // Simulate network delay for creating the request
     setTimeout(() => {
-        createTrip(user, selectedRouteId, date, seats, bookingType, paymentMethod, weight);
+        createTrip(user, selectedRouteId, date, seats, bookingType, paymentMethod);
         setIsProcessing(false);
         setShowPayment(false);
         setRefreshTrigger(prev => prev + 1);
@@ -64,18 +92,39 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
         setSelectedRouteId('');
         setDate('');
         setOrigin('');
-    }, 2000);
+    }, 1500);
+  };
+
+  const handleAcceptQuote = (tripId: string) => {
+      // In a real app, this would open payment modal. 
+      // For mock, we'll assume they select M-Pesa immediately and confirm.
+      acceptParcelQuote(tripId, 'M-Pesa');
+      setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleCancelTrip = (tripId: string) => {
+      if (window.confirm("Tem certeza que deseja cancelar esta viagem/encomenda? O motorista será notificado.")) {
+          cancelTrip(tripId);
+          setRefreshTrigger(prev => prev + 1);
+      }
+  };
+
+  const handleReschedule = () => {
+      if (rescheduleTripId && newDate) {
+          rescheduleTrip(rescheduleTripId, newDate);
+          setRescheduleTripId(null);
+          setNewDate('');
+          setRefreshTrigger(prev => prev + 1);
+      }
   };
 
   const handleStartTrip = (tripId: string) => {
-      // Direct update, no window.confirm which can fail on some webviews
       updateTripStatus(tripId, 'in-progress');
       setConfirmActionId(null);
       setRefreshTrigger(prev => prev + 1);
   };
 
   const handleEndTrip = (tripId: string) => {
-      // Open Rating Modal
       setRatingTripId(tripId);
       setRating(5);
       setSelectedTags([]);
@@ -174,7 +223,7 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
             
             {/* Origin Selector */}
             <div>
-              <label className="block text-slate-400 text-sm mb-2 font-medium">Origem da Viagem</label>
+              <label className="block text-slate-400 text-sm mb-2 font-medium">Origem</label>
               <div className="relative">
                 <Navigation className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
                 <select
@@ -206,7 +255,7 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
                 >
                   <option value="">{origin ? 'Selecione o destino...' : 'Selecione a origem primeiro'}</option>
                   {availableDestinations.map(route => (
-                    <option key={route.id} value={route.id}>{route.destination} - {route.price} MZN</option>
+                    <option key={route.id} value={route.id}>{route.destination} {bookingType === 'passenger' && `- ${route.price} MZN`}</option>
                   ))}
                 </select>
               </div>
@@ -236,31 +285,49 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
                    onChange={(e) => setSeats(Number(e.target.value))}
                    className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl border border-slate-700 focus:border-yellow-400 focus:outline-none"
                  />
+                 <div className="bg-slate-900 p-4 rounded-xl mt-6 flex justify-between items-center border border-slate-700">
+                    <span className="text-slate-400">Total a Pagar</span>
+                    <span className="text-2xl font-bold text-white">{Math.floor(price)} MZN</span>
+                 </div>
                </div>
             ) : (
-                <div>
-                 <label className="block text-slate-400 text-sm mb-2 font-medium">Peso Estimado (KG)</label>
-                 <input
-                   type="number"
-                   min="1"
-                   value={weight}
-                   onChange={(e) => setWeight(Number(e.target.value))}
-                   className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl border border-slate-700 focus:border-yellow-400 focus:outline-none"
-                 />
-               </div>
+               <>
+                   <div className="grid grid-cols-2 gap-4">
+                        <div>
+                             <label className="block text-slate-400 text-sm mb-2 font-medium">Tamanho</label>
+                             <select
+                                value={parcelSize}
+                                onChange={(e) => setParcelSize(e.target.value as ParcelSize)}
+                                className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl border border-slate-700 focus:border-yellow-400 focus:outline-none"
+                             >
+                                 <option value="Pequeno">Pequeno (Envelope/Saco)</option>
+                                 <option value="Médio">Médio (Caixa/Mochila)</option>
+                                 <option value="Grande">Grande (Mala/Eletro.)</option>
+                             </select>
+                        </div>
+                        <div>
+                             <label className="block text-slate-400 text-sm mb-2 font-medium">Descrição</label>
+                             <input
+                               type="text"
+                               placeholder="O que está a enviar?"
+                               value={parcelDesc}
+                               onChange={(e) => setParcelDesc(e.target.value)}
+                               className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl border border-slate-700 focus:border-yellow-400 focus:outline-none"
+                             />
+                        </div>
+                   </div>
+                   <div className="bg-slate-900 p-4 rounded-xl mt-6 border border-slate-700 text-center">
+                        <p className="text-yellow-400 text-sm">O preço será definido pelo administrador após a solicitação.</p>
+                   </div>
+               </>
             )}
 
-            <div className="bg-slate-900 p-4 rounded-xl mt-6 flex justify-between items-center border border-slate-700">
-                <span className="text-slate-400">Total Estimado</span>
-                <span className="text-2xl font-bold text-white">{Math.floor(price)} MZN</span>
-            </div>
-
             <button
-                disabled={!selectedRouteId || !date}
+                disabled={!selectedRouteId || !date || (bookingType === 'parcel' && !parcelDesc)}
                 onClick={handleBook}
                 className="w-full bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-yellow-500 text-slate-900 font-bold py-4 rounded-xl transition-colors mt-2"
             >
-                Continuar para Pagamento
+                {bookingType === 'passenger' ? 'Continuar para Pagamento' : 'Solicitar Cotação'}
             </button>
           </div>
         </div>
@@ -273,6 +340,9 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
             )}
             {history.slice().reverse().map(trip => {
                 const r = routes.find(ro => ro.id === trip.routeId);
+                const driver = trip.driverId ? allUsers.find(u => u.id === trip.driverId) : null;
+                const canCancel = trip.status === 'pending' || trip.status === 'confirmed' || trip.status === 'waiting_quote' || trip.status === 'quote_received';
+                
                 return (
                     <div key={trip.id} className="bg-slate-800 p-5 rounded-xl border border-slate-700">
                         <div className="flex justify-between items-start mb-4">
@@ -286,10 +356,19 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
                                     </span>
                                 </div>
                                 <h3 className="text-lg font-bold text-white">{r?.origin} ➔ {r?.destination}</h3>
+                                {trip.type === 'parcel' && (
+                                    <p className="text-xs text-slate-400 mt-1">Item: {trip.parcelDetails?.description} ({trip.parcelDetails?.size})</p>
+                                )}
                             </div>
                             <div className="text-right">
-                                 <p className="text-lg font-bold text-white">{trip.totalPrice} MT</p>
-                                 <p className="text-xs text-slate-500 mt-1">{trip.paymentMethod}</p>
+                                 {trip.status === 'waiting_quote' ? (
+                                     <p className="text-sm font-bold text-yellow-500 animate-pulse">Aguardando Preço</p>
+                                 ) : (
+                                     <>
+                                        <p className="text-lg font-bold text-white">{trip.totalPrice} MT</p>
+                                        <p className="text-xs text-slate-500 mt-1">{trip.paymentMethod || 'Pendente'}</p>
+                                     </>
+                                 )}
                             </div>
                         </div>
 
@@ -300,15 +379,80 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
                                  trip.status === 'completed' ? 'bg-green-500 text-slate-900' :
                                  trip.status === 'in-progress' ? 'bg-blue-500 text-white animate-pulse' :
                                  trip.status === 'confirmed' ? 'bg-yellow-400 text-slate-900' :
+                                 trip.status === 'quote_received' ? 'bg-blue-500 text-white' :
+                                 trip.status === 'cancelled' ? 'bg-red-500 text-white' :
                                  'bg-slate-700 text-slate-300'
                              }`}>
-                                 {trip.status === 'pending' ? 'Aguardando Motorista' : 
-                                  trip.status === 'confirmed' ? 'Motorista Atribuído' : 
-                                  trip.status === 'in-progress' ? 'Em Trânsito' : 'Concluída'}
+                                 {trip.status === 'pending' ? 'A processar' : 
+                                  trip.status === 'waiting_quote' ? 'Análise' :
+                                  trip.status === 'quote_received' ? 'Cotação Recebida' :
+                                  trip.status === 'confirmed' ? 'Confirmada' : 
+                                  trip.status === 'in-progress' ? 'Em Trânsito' : 
+                                  trip.status === 'cancelled' ? 'Cancelada' : 'Concluída'}
                              </span>
                         </div>
+                        
+                        {/* QUOTE ACTION for Parcels */}
+                        {trip.status === 'quote_received' && (
+                            <div className="bg-slate-900/80 p-3 rounded-lg border border-blue-500/30 mb-4">
+                                <p className="text-sm text-white mb-2">Preço definido: <strong className="text-green-400">{trip.totalPrice} MT</strong></p>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleAcceptQuote(trip.id)}
+                                        className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded"
+                                    >
+                                        Aceitar e Pagar (M-Pesa)
+                                    </button>
+                                    <button 
+                                        onClick={() => handleCancelTrip(trip.id)}
+                                        className="flex-1 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white border border-red-600/50 text-xs font-bold py-2 rounded"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
-                        {/* Action Buttons for Passenger Confirmation */}
+                        {/* DRIVER INFO & CONTACT - Critical Requirement */}
+                        {trip.status === 'confirmed' && driver && (
+                            <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/30 mb-4">
+                                <p className="text-xs text-green-400 font-bold uppercase mb-2">Motorista Atribuído</p>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="text-white font-bold text-lg">{driver.name}</p>
+                                        <p className="text-slate-400 text-sm uppercase">{driver.vehiclePlate}</p>
+                                    </div>
+                                    <a href={`tel:${driver.phone}`} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition-colors">
+                                        <Phone size={18} />
+                                        <span>Ligar</span>
+                                    </a>
+                                </div>
+                                <div className="mt-3 text-xs text-slate-300 bg-slate-900/50 p-2 rounded flex items-start gap-2">
+                                    <AlertTriangle size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+                                    <span>Por favor, entre em contacto com o motorista agora para combinar o local exato de recolha e a hora.</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Passenger Actions (Cancel / Reschedule) */}
+                        {canCancel && (
+                            <div className="flex gap-2 mt-4 pt-4 border-t border-slate-700">
+                                <button 
+                                    onClick={() => handleCancelTrip(trip.id)}
+                                    className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs font-medium px-2 py-1"
+                                >
+                                    <XCircle size={14} /> Cancelar
+                                </button>
+                                <button 
+                                    onClick={() => setRescheduleTripId(trip.id)}
+                                    className="flex items-center gap-1 text-yellow-400 hover:text-yellow-300 text-xs font-medium px-2 py-1"
+                                >
+                                    <RotateCw size={14} /> Adiar/Remarcar
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Trip Progress Actions */}
                         {trip.status === 'confirmed' && (
                             <div className="mt-4">
                                 {confirmActionId === `start_${trip.id}` ? (
@@ -369,12 +513,6 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
                             </div>
                         )}
                         
-                        {trip.status === 'pending' && (
-                             <p className="text-xs text-slate-500 text-center bg-slate-900/50 p-2 rounded">
-                                 A aguardar confirmação do administrador.
-                             </p>
-                        )}
-                        
                         {trip.status === 'completed' && trip.rating && (
                             <div className="mt-2 text-center p-2 bg-slate-900/50 rounded-lg">
                                 <div className="flex justify-center text-yellow-400 mb-1">
@@ -395,59 +533,85 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
 
       {/* Payment Modal */}
       {showPayment && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-800 w-full max-w-sm rounded-2xl p-6 border border-slate-700 relative">
-                <h3 className="text-xl font-bold text-white mb-4">Pagamento Seguro</h3>
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-slate-800 w-full max-w-sm rounded-2xl p-6 border border-slate-700 relative my-auto">
+                <h3 className="text-xl font-bold text-white mb-4 text-center">Pagamento Manual</h3>
                 
                 {isProcessing ? (
                      <div className="flex flex-col items-center justify-center py-8">
                         <div className="w-12 h-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-                        <p className="text-slate-300">A processar {paymentMethod}...</p>
-                        <p className="text-xs text-slate-500 mt-2">Aguarde a notificação no seu telemóvel</p>
+                        <p className="text-slate-300">A registar o seu pedido...</p>
                      </div>
                 ) : (
                     <>
                         <div className="bg-slate-900 p-4 rounded-xl mb-4 border border-slate-600">
-                             <div className="flex justify-between mb-2">
-                                <span className="text-slate-400">Serviço</span>
-                                <span className="text-white">{bookingType === 'passenger' ? 'Bilhete' : 'Encomenda'}</span>
+                             <div className="flex justify-between border-b border-slate-700 pb-2 mb-2">
+                                <span className="text-slate-200 font-bold">Total a Transferir</span>
+                                <span className="text-yellow-400 font-bold text-lg">{Math.floor(price)} MZN</span>
                              </div>
-                             <div className="flex justify-between mb-2">
-                                <span className="text-slate-400">Rota</span>
-                                <span className="text-white">{origin} - {selectedRoute?.destination}</span>
+                             
+                             <div className="grid grid-cols-2 gap-3 mb-4">
+                                <button 
+                                    onClick={() => setPaymentMethod('M-Pesa')}
+                                    className={`py-2 rounded-lg font-bold text-sm border transition-all ${paymentMethod === 'M-Pesa' ? 'bg-red-600 border-red-500 text-white' : 'bg-transparent border-slate-600 text-slate-400'}`}
+                                >
+                                    M-Pesa
+                                </button>
+                                <button 
+                                    onClick={() => setPaymentMethod('E-Mola')}
+                                    className={`py-2 rounded-lg font-bold text-sm border transition-all ${paymentMethod === 'E-Mola' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-transparent border-slate-600 text-slate-400'}`}
+                                >
+                                    E-Mola
+                                </button>
                              </div>
-                             <div className="flex justify-between border-t border-slate-700 pt-2 mt-2">
-                                <span className="text-slate-200 font-bold">Total a Pagar</span>
-                                <span className="text-yellow-400 font-bold">{Math.floor(price)} MZN</span>
-                             </div>
-                        </div>
 
-                        <div className="space-y-3 mb-6">
-                            <button 
-                                onClick={() => setPaymentMethod('M-Pesa')}
-                                className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold border-2 transition-all ${paymentMethod === 'M-Pesa' ? 'bg-red-600 border-red-400 text-white' : 'bg-transparent border-slate-600 text-slate-400 hover:border-red-600 hover:text-white'}`}
-                            >
-                                M-Pesa
-                            </button>
-                            <button 
-                                onClick={() => setPaymentMethod('E-Mola')}
-                                className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold border-2 transition-all ${paymentMethod === 'E-Mola' ? 'bg-purple-600 border-purple-400 text-white' : 'bg-transparent border-slate-600 text-slate-400 hover:border-purple-600 hover:text-white'}`}
-                            >
-                                E-Mola
-                            </button>
+                             <div className={`p-4 rounded-lg text-center border-2 mb-2 transition-all ${paymentMethod === 'M-Pesa' ? 'bg-red-500/10 border-red-500' : 'bg-purple-500/10 border-purple-500'}`}>
+                                 <p className="text-slate-400 text-xs uppercase font-bold mb-1">Transferir para:</p>
+                                 <p className="text-2xl font-black text-white tracking-wider">
+                                     {paymentMethod === 'M-Pesa' ? '84 456 7470' : '86 067 5792'}
+                                 </p>
+                                 <p className="text-sm font-bold text-yellow-400 mt-1 mb-1">Estevão Sitefane</p>
+                                 <p className="text-xs text-slate-300">GoQuantum (Admin)</p>
+                             </div>
                         </div>
 
                         <div className="flex gap-3">
-                            <button onClick={() => setShowPayment(false)} className="flex-1 py-3 text-slate-400 font-medium hover:text-white">Cancelar</button>
-                            <button onClick={confirmPayment} className="flex-1 bg-yellow-400 text-slate-900 font-bold rounded-lg py-3 hover:bg-yellow-500">Confirmar</button>
+                            <button onClick={() => setShowPayment(false)} className="flex-1 py-3 text-slate-400 font-medium hover:text-white text-sm">Cancelar</button>
+                            <button onClick={confirmPayment} className="flex-[2] bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 shadow-lg text-sm">
+                                Já fiz a transferência
+                            </button>
                         </div>
                     </>
                 )}
             </div>
         </div>
       )}
+      
+      {/* Reschedule Modal */}
+      {rescheduleTripId && (
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+               <div className="bg-slate-800 w-full max-w-sm rounded-2xl p-6 border border-slate-700">
+                   <h3 className="text-lg font-bold text-white mb-4">Adiar / Remarcar Viagem</h3>
+                   <p className="text-xs text-slate-400 mb-4">Escolha uma nova data. O motorista atual será desvinculado e uma nova atribuição será feita pelo administrador.</p>
+                   
+                   <input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-600 mb-4 focus:border-yellow-400"
+                   />
+                   
+                   <div className="flex gap-3">
+                        <button onClick={() => setRescheduleTripId(null)} className="flex-1 py-3 text-slate-400 hover:text-white text-sm">Cancelar</button>
+                        <button onClick={handleReschedule} disabled={!newDate} className="flex-[2] bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-slate-900 font-bold rounded-lg py-3 text-sm">
+                            Confirmar Nova Data
+                        </button>
+                   </div>
+               </div>
+          </div>
+      )}
 
-      {/* RATING MODAL (Yango Style) */}
+      {/* RATING MODAL */}
       {showRatingModal && (
           <div className="fixed inset-0 bg-black/90 flex items-end sm:items-center justify-center p-4 z-[60]">
               <div className="bg-slate-800 w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 border-t sm:border border-slate-700 animate-in slide-in-from-bottom-10">
@@ -459,7 +623,6 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
                       <p className="text-slate-400 text-sm mt-1">Como foi a sua viagem?</p>
                   </div>
 
-                  {/* Stars */}
                   <div className="flex justify-center gap-2 mb-6">
                       {[1, 2, 3, 4, 5].map((star) => (
                           <button 
@@ -476,7 +639,6 @@ export const PassengerView: React.FC<PassengerViewProps> = ({ user }) => {
                       ))}
                   </div>
 
-                  {/* Feedback Tags */}
                   <div className="flex flex-wrap justify-center gap-2 mb-8">
                       {FEEDBACK_TAGS.map(tag => (
                           <button

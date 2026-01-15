@@ -3,22 +3,23 @@ import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 
 /**
- * Inicialização da aplicação GoQuantum
- * O uso de caminhos relativos (./App.tsx) garante que o GitHub Pages
- * consiga resolver os ficheiros independentemente do subdiretório.
+ * Inicialização profissional da aplicação GoQuantum
+ * Caminhos relativos garantem funcionamento no GitHub Pages
  */
 
-console.log("GoQuantum: Sistema a iniciar...");
+console.log("GoQuantum: A carregar módulos do sistema...");
 
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  console.error("GoQuantum: Erro Fatal - Contentor 'root' não encontrado no DOM.");
+  console.error("GoQuantum: Erro Crítico - Contentor 'root' não encontrado.");
 } else {
+  // O uso de createRoot é obrigatório para o React 18
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
+  console.log("GoQuantum: Aplicação montada com sucesso.");
 }

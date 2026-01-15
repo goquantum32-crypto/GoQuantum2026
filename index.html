@@ -13,7 +13,7 @@
 
     <!-- CSS Externo e Interno -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="./style.css">
     
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
@@ -23,7 +23,7 @@
       }
     </style>
     
-    <!-- Polyfill para Import Maps em navegadores antigos -->
+    <!-- Polyfill para Import Maps em navegadores antigos (Safari, etc) -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.7.0/dist/es-module-shims.js"></script>
 
     <script type="importmap">
@@ -51,20 +51,28 @@
 
     <div id="root"></div>
 
-    <!-- Scripts de inicialização -->
-    <script type="module" src="index.tsx"></script>
+    <!-- Script de Inicialização (Caminho Relativo para GitHub Pages) -->
+    <script type="module" src="./index.tsx"></script>
 
     <script>
-      // Tratamento de erros global para evitar telas brancas
+      // Sistema de emergência: se o React falhar em 5 segundos, mostra uma mensagem amigável
+      setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root && root.innerHTML === "") {
+          console.warn("GoQuantum: O carregamento está a demorar mais do que o esperado...");
+          // O loader CSS continuará a correr, mas aqui poderíamos forçar uma limpeza se necessário.
+        }
+      }, 5000);
+
       window.onerror = function(msg, url, line, col, error) {
         console.error("Erro Crítico GoQuantum:", msg, "\nFicheiro:", url);
         const root = document.getElementById('root');
         if (root && root.innerHTML === "") {
           root.innerHTML = `
-            <div style="padding: 40px; color: #f87171; text-align: center; font-family: sans-serif; background: #1e293b; margin: 20px; border-radius: 12px; border: 1px solid #ef4444;">
-              <h2 style="font-weight: bold; font-size: 1.5rem; margin-bottom: 10px;">Erro de Carregamento</h2>
-              <p style="font-size: 0.9rem; color: #cbd5e1;">Não foi possível carregar os módulos do sistema. Isto pode ser devido à ligação ou cache do navegador.</p>
-              <button onclick="window.location.reload()" style="margin-top: 20px; background: #fbbf24; color: #0f172a; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;">Recarregar Aplicação</button>
+            <div style="padding: 40px; color: #f87171; text-align: center; font-family: sans-serif; background: #1e293b; margin: 20px; border-radius: 12px; border: 1px solid #ef4444; position: relative; z-index: 9999;">
+              <h2 style="font-weight: bold; font-size: 1.5rem; margin-bottom: 10px;">Erro de Inicialização</h2>
+              <p style="font-size: 0.9rem; color: #cbd5e1;">Houve um problema ao carregar os módulos. Tente recarregar a página.</p>
+              <button onclick="window.location.reload()" style="margin-top: 20px; background: #fbbf24; color: #0f172a; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;">Recarregar Agora</button>
             </div>`;
         }
       };

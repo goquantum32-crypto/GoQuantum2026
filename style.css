@@ -7,9 +7,11 @@
 body {
     overflow-x: hidden;
     scroll-behavior: smooth;
+    background-color: #0f172a;
 }
 
 /* Animação de Carregamento Customizada */
+/* Usamos :empty para que o loader desapareça AUTOMATICAMENTE quando o React colocar conteúdo no #root */
 #root:empty::before {
     content: "";
     position: fixed;
@@ -22,6 +24,7 @@ body {
     border-top-color: #fbbf24;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+    z-index: 999;
 }
 
 #root:empty::after {
@@ -33,6 +36,7 @@ body {
     color: #94a3b8;
     font-size: 0.875rem;
     font-weight: 500;
+    z-index: 999;
 }
 
 @keyframes spin {
@@ -59,7 +63,7 @@ body {
 
 /* Ajustes para inputs iOS */
 input, select, textarea {
-    font-size: 16px !important; /* Evita o zoom automático no iPhone */
+    font-size: 16px !important; 
 }
 
 /* Classes de utilidade para animações suaves */

@@ -1,4 +1,4 @@
-/* Reset e Estilos de Base */
+/* Reset Global */
 * {
     -webkit-tap-highlight-color: transparent;
     box-sizing: border-box;
@@ -7,45 +7,16 @@
 body {
     overflow-x: hidden;
     scroll-behavior: smooth;
-    background-color: #0f172a;
 }
 
-/* Animação de Carregamento Customizada */
-/* Usamos :empty para que o loader desapareça AUTOMATICAMENTE quando o React colocar conteúdo no #root */
-#root:empty::before {
-    content: "";
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: 40px;
-    height: 40px;
-    margin: -20px 0 0 -20px;
-    border: 3px solid rgba(251, 191, 36, 0.1);
-    border-top-color: #fbbf24;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    z-index: 999;
-}
-
-#root:empty::after {
-    content: "A preparar GoQuantum...";
-    position: fixed;
-    top: calc(50% + 40px);
-    left: 50%;
-    transform: translateX(-50%);
-    color: #94a3b8;
-    font-size: 0.875rem;
-    font-weight: 500;
-    z-index: 999;
-}
-
+/* Animação do Spinner */
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
 
-/* Melhorias de Scroll */
+/* Melhorias de Scrollbar */
 ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -57,18 +28,14 @@ body {
     border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #475569;
-}
-
-/* Ajustes para inputs iOS */
+/* Correções para dispositivos móveis */
 input, select, textarea {
-    font-size: 16px !important; 
+    font-size: 16px !important;
 }
 
-/* Classes de utilidade para animações suaves */
+/* Animações de entrada */
 .fade-in {
-    animation: fadeIn 0.3s ease-out forwards;
+    animation: fadeIn 0.4s ease-out forwards;
 }
 
 @keyframes fadeIn {

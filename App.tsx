@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { User } from './types';
-import { Layout } from './components/Layout';
-import { AuthView } from './components/AuthView';
-import { PassengerView } from './components/PassengerView';
-import { DriverDashboard } from './components/DriverDashboard';
-import { AdminDashboard } from './components/AdminDashboard';
+import { User } from './types.ts';
+import { Layout } from './components/Layout.tsx';
+import { AuthView } from './components/AuthView.tsx';
+import { PassengerView } from './components/PassengerView.tsx';
+import { DriverDashboard } from './components/DriverDashboard.tsx';
+import { AdminDashboard } from './components/AdminDashboard.tsx';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
 
-  // Simple session persistence check (mock)
   useEffect(() => {
     const saved = localStorage.getItem('gq_user');
     if (saved) {
-      setUser(JSON.parse(saved));
+      try {
+        setUser(JSON.parse(saved));
+      } catch (e) {
+        console.error("Erro ao carregar sessão:", e);
+      }
     }
   }, []);
 

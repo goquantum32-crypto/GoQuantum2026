@@ -4,21 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     
-    <!-- SEO & Social Sharing -->
     <title>GoQuantum - Transporte Interprovincial</title>
-    <meta name="description" content="Agende viagens e envie encomendas entre Maputo, Gaza e Inhambane com a GoQuantum. Pagamentos via M-Pesa e E-Mola.">
-    <meta property="og:title" content="GoQuantum - Transporte Interprovincial">
-    <meta property="og:description" content="Viaje com segurança. Reserve seu lugar ou envie encomendas agora.">
-    <meta property="og:image" content="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80">
-    <meta property="og:type" content="website">
+    <meta name="description" content="Agende viagens e envie encomendas entre Maputo, Gaza e Inhambane com a GoQuantum.">
 
-    <!-- PWA / Mobile Compatibility -->
-    <link rel="manifest" href="/manifest.json">
+    <!-- PWA -->
     <meta name="theme-color" content="#0f172a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="GoQuantum">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3063/3063822.png">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3063/3063822.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,45 +16,64 @@
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
       body {
         font-family: 'Inter', sans-serif;
-        overscroll-behavior-y: none; 
-        background-color: #0f172a; /* Slate 900 fallback */
+        background-color: #0f172a;
+        margin: 0;
+        padding: 0;
       }
-      /* Custom scrollbar for webkit */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1e293b;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #475569;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
+      #root:empty::before {
+        content: "A carregar GoQuantum...";
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #94a3b8;
+        font-size: 1.1rem;
+        font-weight: 500;
       }
     </style>
     
-    <!-- 
-      CONFIGURAÇÃO CRÍTICA DE IMPORTAÇÃO 
-      Esta versão usa apenas React 18 para máxima compatibilidade.
-    -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
     "lucide-react": "https://esm.sh/lucide-react@0.263.1?deps=react@18.2.0",
     "recharts": "https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
   </head>
-  <body class="bg-slate-900 text-slate-100 antialiased selection:bg-yellow-400 selection:text-slate-900">
+  <body class="bg-slate-900 text-slate-100 antialiased">
+    <noscript>
+      <div style="text-align: center; padding: 50px; color: white;">
+        <h1>JavaScript Necessário</h1>
+        <p>Por favor, ative o JavaScript no seu navegador para utilizar o GoQuantum.</p>
+      </div>
+    </noscript>
+
     <div id="root"></div>
+
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        console.error("Erro Crítico GoQuantum:", msg, "\nNo ficheiro:", url, "\nLinha:", line);
+        const root = document.getElementById('root');
+        if (root) {
+          root.innerHTML = `<div style="padding: 40px; color: #f87171; text-align: center; font-family: sans-serif; background: #1e293b; margin: 20px; border-radius: 12px; border: 1px solid #ef4444;">
+            <h2 style="font-weight: bold; font-size: 1.5rem; margin-bottom: 10px;">Erro de Execução</h2>
+            <p style="font-size: 0.9rem; color: #cbd5e1;">A aplicação não conseguiu iniciar corretamente devido a um conflito de bibliotecas.</p>
+            <div style="background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 20px; text-align: left; font-family: monospace; font-size: 0.8rem; overflow: auto;">
+              ${msg}
+            </div>
+            <button onclick="window.location.reload()" style="margin-top: 20px; background: #fbbf24; color: #0f172a; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;">Tentar Novamente</button>
+          </div>`;
+        }
+      };
+    </script>
+
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>

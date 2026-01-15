@@ -29,6 +29,7 @@
         color: #94a3b8;
         font-size: 1.1rem;
         font-weight: 500;
+        letter-spacing: 0.05em;
       }
     </style>
     
@@ -58,14 +59,15 @@
     <div id="root"></div>
 
     <script>
+      // Sistema de logs para depuração em produção
       window.onerror = function(msg, url, line, col, error) {
         console.error("Erro Crítico GoQuantum:", msg, "\nNo ficheiro:", url, "\nLinha:", line);
         const root = document.getElementById('root');
-        if (root) {
+        if (root && root.innerHTML === "") {
           root.innerHTML = `<div style="padding: 40px; color: #f87171; text-align: center; font-family: sans-serif; background: #1e293b; margin: 20px; border-radius: 12px; border: 1px solid #ef4444;">
-            <h2 style="font-weight: bold; font-size: 1.5rem; margin-bottom: 10px;">Erro de Execução</h2>
-            <p style="font-size: 0.9rem; color: #cbd5e1;">A aplicação não conseguiu iniciar corretamente devido a um conflito de bibliotecas.</p>
-            <div style="background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 20px; text-align: left; font-family: monospace; font-size: 0.8rem; overflow: auto;">
+            <h2 style="font-weight: bold; font-size: 1.5rem; margin-bottom: 10px;">Falha na Inicialização</h2>
+            <p style="font-size: 0.9rem; color: #cbd5e1;">Não foi possível carregar o sistema.</p>
+            <div style="background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 20px; text-align: left; font-family: monospace; font-size: 0.8rem; overflow: auto; color: #fca5a5;">
               ${msg}
             </div>
             <button onclick="window.location.reload()" style="margin-top: 20px; background: #fbbf24; color: #0f172a; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer;">Tentar Novamente</button>
